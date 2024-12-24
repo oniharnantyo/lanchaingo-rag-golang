@@ -1,0 +1,71 @@
+services:
+  mongodb:
+    image: mongodb/mongodb-community-server:6.0-ubi8
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=admin
+      - MONGODB_INITDB_ROOT_PASSWORD=password
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - local-llm
+  postgres:
+    image: ankane/pgvector:latest
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=llm
+    networks:
+      - local-llm
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ./ollama-data/ollama:/root/.ollama
+      - ./ollama-entrypoint.sh:/ollama-entrypoint.sh
+    tty: true
+    restart: unless-stopped
+    entrypoint: ["/usr/bin/bash", "/ollama-entrypoint.sh"]
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    networks:
+      - local-llm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  backend:
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+#    environment:
+#      MONGODB_URI: mongodb://admin:password@mongodb:27017
+#      MONGODB_DB: llm
+#      POSTGRES_URI: postgresql://admin:password@postgres:5432/llm
+#      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      - postgres
+      - ollama
+      - mongodb
+    networks:
+      - local-llm
+networks:
+  local-llm:
+volumes:
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./mongodb_data
+      o: bind

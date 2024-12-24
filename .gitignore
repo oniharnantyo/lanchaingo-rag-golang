@@ -1,0 +1,4 @@
+.idea
+ollama-data
+postgres_data
+mongodb_data
